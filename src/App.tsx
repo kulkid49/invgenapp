@@ -1236,10 +1236,6 @@ function App() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Invoice Preview ({invoiceTemplates.find(t => t.id === selectedTemplate)?.name})</CardTitle>
                 <div className="flex gap-2">
-                  <Button onClick={handleGenerateHTML} variant="outline" className="gap-2">
-                    <Download className="w-4 h-4" />
-                    HTML
-                  </Button>
                   <Button onClick={handleGeneratePDF} className="gap-2">
                     <FileDown className="w-4 h-4" />
                     PDF
