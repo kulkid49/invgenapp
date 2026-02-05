@@ -74,8 +74,8 @@ export const defaultInvoiceData: InvoiceData = {
     },
     {
       id: "2",
-      materialNo: "Copper Oxide_New",
-      description: "Copper Oxide",
+      materialNo: "504",
+      description: "Copper Oxide_New",
       qty: 10,
       unit: "PC",
       price: 2208.50
