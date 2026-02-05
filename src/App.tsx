@@ -4,11 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, FileText, Download, FileDown, LayoutTemplate } from 'lucide-react';
+import { Plus, Trash2, FileText, Download, LayoutTemplate } from 'lucide-react';
 import { defaultInvoiceData, invoiceTemplates } from '@/types/invoice';
 import type { InvoiceData, MaterialLineItem, InvoiceTemplate } from '@/types/invoice';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import html2pdf from 'html2pdf.js';
 import './App.css';
 
 function App() {
@@ -779,210 +778,35 @@ function App() {
     return templates[selectedTemplate];
   };
 
-  const handleGenerateHTML = () => {
+  const handleDownloadInvoice = () => {
     const htmlContent = generateInvoiceHTML();
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Invoice_${invoiceData.invoiceNumber}_${selectedTemplate}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+    const parsedDocument = new DOMParser().parseFromString(htmlContent, 'text/html');
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.style.width = '800px';
+    container.append(...Array.from(parsedDocument.body.children));
+    document.body.appendChild(container);
 
-  const handleGeneratePDF = () => {
-    const doc = new jsPDF({
-      unit: 'mm',
-      format: 'a4',
-      orientation: 'portrait'
-    });
+    const filename = `Invoice_${invoiceData.invoiceNumber}_${selectedTemplate}.pdf`;
 
-    const subtotal = calculateSubtotal();
-    const tax = calculateTax();
-    const total = calculateTotal();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
-    const contentWidth = pageWidth - (margin * 2);
-
-    // Template-specific PDF generation
-    switch (selectedTemplate) {
-      case 'modern':
-        // Gradient header effect with colored header
-        doc.setFillColor(102, 126, 234);
-        doc.rect(0, 0, pageWidth, 50, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(10);
-        doc.text(invoiceData.vendorName, margin, 20);
-        doc.setFontSize(30);
-        doc.text('INVOICE', pageWidth - margin - 40, 30, { align: 'right' });
-        
-        doc.setTextColor(80, 80, 80);
-        doc.setFontSize(10);
-        doc.text('Bill To:', margin, 65);
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        doc.text(invoiceData.billTo.companyName, margin, 72);
-        doc.setFontSize(10);
-        doc.text(invoiceData.billTo.address, margin, 78);
-        
-        doc.setTextColor(80, 80, 80);
-        doc.text(`Invoice #: ${invoiceData.invoiceNumber}`, pageWidth - margin - 50, 65);
-        doc.text(`Date: ${formatDate(invoiceData.invoiceDate)}`, pageWidth - margin - 50, 71);
-        doc.text(`Ref. PO: ${invoiceData.refPO}`, pageWidth - margin - 50, 77);
-        doc.text(`Currency: ${invoiceData.currency}`, pageWidth - margin - 50, 83);
-        break;
-
-      case 'minimal':
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(invoiceData.vendorName, margin, 25);
-        doc.setFontSize(36);
-        doc.setTextColor(0, 0, 0);
-        doc.text('Invoice', margin, 40);
-        
-        doc.setFontSize(9);
-        doc.setTextColor(150, 150, 150);
-        doc.text('BILL TO', margin, 60);
-        doc.setFontSize(11);
-        doc.setTextColor(0, 0, 0);
-        doc.text(invoiceData.billTo.companyName, margin, 67);
-        doc.text(invoiceData.billTo.address, margin, 73);
-        
-        doc.setTextColor(100, 100, 100);
-        doc.text(`# ${invoiceData.invoiceNumber}`, pageWidth - margin, 60, { align: 'right' });
-        doc.text(`Date ${formatDate(invoiceData.invoiceDate)}`, pageWidth - margin, 66, { align: 'right' });
-        doc.text(`PO ${invoiceData.refPO}`, pageWidth - margin, 72, { align: 'right' });
-        doc.text(`Currency ${invoiceData.currency}`, pageWidth - margin, 78, { align: 'right' });
-        break;
-
-      case 'bold':
-        doc.setFillColor(255, 107, 107);
-        doc.rect(0, 0, pageWidth, 15, 'F');
-        doc.setFillColor(255, 255, 255);
-        doc.rect(0, 15, pageWidth, 100, 'F');
-        
-        doc.setTextColor(255, 107, 107);
-        doc.setFontSize(12);
-        doc.text(invoiceData.vendorName, margin, 35);
-        doc.setFontSize(48);
-        doc.setTextColor(50, 50, 50);
-        doc.text('INVOICE', margin, 60);
-        
-        doc.setFillColor(50, 50, 50);
-        doc.rect(margin, 75, contentWidth, 20, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(10);
-        const colWidth = contentWidth / 4;
-        doc.text(`Inv: ${invoiceData.invoiceNumber}`, margin + 5, 87);
-        doc.text(`Date: ${formatDate(invoiceData.invoiceDate)}`, margin + colWidth + 5, 87);
-        doc.text(`PO: ${invoiceData.refPO}`, margin + colWidth * 2 + 5, 87);
-        doc.text(`Curr: ${invoiceData.currency}`, margin + colWidth * 3 + 5, 87);
-        break;
-
-      case 'premium':
-        doc.setFillColor(102, 126, 234);
-        doc.rect(0, 0, pageWidth, 60, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(10);
-        doc.text(invoiceData.vendorName, margin, 25);
-        doc.setFontSize(32);
-        doc.text('Invoice', margin, 45);
-        doc.setFillColor(255, 255, 255);
-        doc.setDrawColor(200, 200, 200);
-        doc.roundedRect(pageWidth - margin - 50, 20, 45, 25, 5, 5, 'FD');
-        doc.setTextColor(102, 126, 234);
-        doc.setFontSize(14);
-        doc.text(invoiceData.invoiceNumber, pageWidth - margin - 27, 35, { align: 'center' });
-        break;
-
-      default: // classic and others
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        doc.text(invoiceData.vendorName, margin, 25);
-        doc.setFontSize(28);
-        doc.setTextColor(0, 0, 0);
-        doc.text('INVOICE', pageWidth - margin, 30, { align: 'right' });
-        
-        doc.setDrawColor(200, 200, 200);
-        doc.line(margin, 40, pageWidth - margin, 40);
-        
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        doc.text('Bill To:', margin, 55);
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        doc.text(invoiceData.billTo.companyName, margin, 62);
-        doc.setFontSize(10);
-        doc.text(invoiceData.billTo.address, margin, 68);
-        
-        doc.setTextColor(80, 80, 80);
-        doc.text(`Invoice #: ${invoiceData.invoiceNumber}`, pageWidth - margin, 55, { align: 'right' });
-        doc.text(`Date: ${formatDate(invoiceData.invoiceDate)}`, pageWidth - margin, 61, { align: 'right' });
-        doc.text(`Ref. PO: ${invoiceData.refPO}`, pageWidth - margin, 67, { align: 'right' });
-        doc.text(`Currency: ${invoiceData.currency}`, pageWidth - margin, 73, { align: 'right' });
-    }
-
-    // Table
-    const tableData = invoiceData.lineItems.map(item => [
-      item.materialNo,
-      item.description,
-      item.qty.toString(),
-      item.unit,
-      `${item.price.toFixed(2)}`,
-      `${calculateLineTotal(item).toFixed(2)}`
-    ]);
-
-    const tableStartY = selectedTemplate === 'bold' ? 105 : 85;
-
-    autoTable(doc, {
-      startY: tableStartY,
-      head: [['Material No.', 'Description', 'Qty', 'Unit', 'Price', 'Total']],
-      body: tableData,
-      theme: selectedTemplate === 'modern' ? 'grid' : 'striped',
-      headStyles: {
-        fillColor: selectedTemplate === 'modern' ? [102, 126, 234] : selectedTemplate === 'bold' ? [255, 107, 107] : [50, 50, 50],
-        textColor: 255,
-        fontSize: 10
-      },
-      styles: {
-        fontSize: 10,
-        cellPadding: 5
-      },
-      columnStyles: {
-        4: { halign: 'right' },
-        5: { halign: 'right' }
-      }
-    });
-
-    // Totals
-    const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
-    const totalsX = pageWidth - margin - 70;
-
-    doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
-    doc.text('Subtotal:', totalsX, finalY);
-    doc.text(`${subtotal.toFixed(2)} ${invoiceData.currency}`, pageWidth - margin, finalY, { align: 'right' });
-    
-    doc.text(`Tax (${invoiceData.taxRate}%):`, totalsX, finalY + 7);
-    doc.text(`${tax.toFixed(2)} ${invoiceData.currency}`, pageWidth - margin, finalY + 7, { align: 'right' });
-    
-    doc.setDrawColor(150, 150, 150);
-    doc.line(totalsX, finalY + 12, pageWidth - margin, finalY + 12);
-    
-    doc.setFontSize(14);
-    doc.setTextColor(0, 0, 0);
-    doc.text('TOTAL:', totalsX, finalY + 20);
-    doc.text(`${total.toFixed(2)} ${invoiceData.currency}`, pageWidth - margin, finalY + 20, { align: 'right' });
-
-    // Bank details
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text('Bank Details:', margin, finalY + 35);
-    doc.text(`Bank: ${invoiceData.bankDetails.bankName} | Account: ${invoiceData.bankDetails.account} | SWIFT: ${invoiceData.bankDetails.swift}`, margin, finalY + 42);
-
-    doc.save(`Invoice_${invoiceData.invoiceNumber}_${selectedTemplate}.pdf`);
+    html2pdf()
+      .set({
+        margin: 0,
+        filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
+      })
+      .from(container)
+      .save()
+      .then(() => {
+        document.body.removeChild(container);
+      })
+      .catch(() => {
+        document.body.removeChild(container);
+      });
   };
 
   const getPreviewStyles = () => {
@@ -1236,9 +1060,9 @@ function App() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Invoice Preview ({invoiceTemplates.find(t => t.id === selectedTemplate)?.name})</CardTitle>
                 <div className="flex gap-2">
-                  <Button onClick={handleGeneratePDF} className="gap-2">
-                    <FileDown className="w-4 h-4" />
-                    PDF
+                  <Button onClick={handleDownloadInvoice} className="gap-2">
+                    <Download className="w-4 h-4" />
+                    Download Invoice
                   </Button>
                 </div>
               </CardHeader>
