@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, FileText, Download, LayoutTemplate } from 'lucide-react';
 import { defaultInvoiceData, invoiceTemplates } from '@/types/invoice';
 import type { InvoiceData, MaterialLineItem, InvoiceTemplate } from '@/types/invoice';
-import html2pdf from 'html2pdf.js';
 import './App.css';
 
 function App() {
@@ -780,33 +779,29 @@ function App() {
 
   const handleDownloadInvoice = () => {
     const htmlContent = generateInvoiceHTML();
-    const parsedDocument = new DOMParser().parseFromString(htmlContent, 'text/html');
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.left = '-9999px';
-    container.style.top = '0';
-    container.style.width = '800px';
-    container.append(...Array.from(parsedDocument.body.children));
-    document.body.appendChild(container);
+    const printWindow = window.open('', '_blank', 'width=900,height=650');
+    if (!printWindow) {
+      return;
+    }
 
-    const filename = `Invoice_${invoiceData.invoiceNumber}_${selectedTemplate}.pdf`;
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.focus();
 
-    html2pdf()
-      .set({
-        margin: 0,
-        filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
-      })
-      .from(container)
-      .save()
-      .then(() => {
-        document.body.removeChild(container);
-      })
-      .catch(() => {
-        document.body.removeChild(container);
-      });
+    const triggerPrint = () => {
+      printWindow.focus();
+      printWindow.print();
+      printWindow.onafterprint = () => {
+        printWindow.close();
+      };
+    };
+
+    if (printWindow.document.readyState === 'complete') {
+      triggerPrint();
+    } else {
+      printWindow.onload = triggerPrint;
+    }
   };
 
   const getPreviewStyles = () => {
